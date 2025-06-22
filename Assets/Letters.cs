@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
-
 using Random = UnityEngine.Random;
 
 public class Letters : MonoBehaviour
@@ -31,8 +32,6 @@ public class Letters : MonoBehaviour
         // If we are in the bottom row, and the 3×3 above and to our left is all empty, we force a true value.
         for (var i = 0; i < 3 * 13; i++)
             solution[i] = i >= 2 * 13 + 2 && Enumerable.Range(0, 8).All(j => !solution[i - 2 * 13 - 2 + (j % 3) + 13 * (j / 3)]) || rnd.Next(0, 5) < 2;
-
-        Debug.Log($"♦ {solution.Select(s => s ? "1" : "0").Join("")}");
 
         lowLetter = Random.Range(0, 11);
         Debug.Log($"[Letters #{moduleId}] Letter range is: {(char) ('A' + lowLetter)}–{(char) ('A' + lowLetter + 15)}");
@@ -116,5 +115,41 @@ public class Letters : MonoBehaviour
             }
             return false;
         };
+    }
+
+    // Twitch Plays
+#pragma warning disable 414
+    private readonly string TwitchHelpMessage = @"!{0} A1, B2 [columns A–C, rows 1–3] | !{0} 1, 5 [buttons in reading order]";
+#pragma warning restore 414
+
+    List<KMSelectable> ProcessTwitchCommand(string command)
+    {
+        var buttons = new List<KMSelectable>();
+        while (!Regex.IsMatch(command, @"^\s*$"))
+        {
+            Match m;
+            int result;
+            if ((m = Regex.Match(command, @"^\s*(?<col>[A-C])(?<row>[1-3])\s*[;,]?", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)).Success)
+                buttons.Add(Buttons[m.Groups[1].Value.ToLowerInvariant()[0] - 'a' + 3 * (m.Groups[2].Value[0] - '1')]);
+            else if ((m = Regex.Match(command, @"^\s*(\d+)\s*[;,]?")).Success && int.TryParse(m.Groups[1].Value, out result) && result >= 1 && result <= 9)
+                buttons.Add(Buttons[result - 1]);
+            else
+                return null;
+            command = command.Substring(m.Length);
+        }
+        return buttons.Count > 0 ? buttons : null;
+    }
+
+    IEnumerator TwitchHandleForcedSolve()
+    {
+        if (moduleSolved)
+            yield break;
+
+        for (var i = 0; i < 9; i++)
+            if (state[i] != solution[i % 3 + 13 * (i / 3) + lowLetter])
+            {
+                Buttons[i].OnInteract();
+                yield return new WaitForSeconds(.2f);
+            }
     }
 }
