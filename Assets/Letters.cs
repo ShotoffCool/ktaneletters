@@ -1,126 +1,80 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-public class Letters : MonoBehaviour {
+using Random = UnityEngine.Random;
 
-    public KMBombModule module;
-    public KMAudio audio;
+public class Letters : MonoBehaviour
+{
+    public KMBombModule Module;
+    public KMAudio Audio;
+    public KMSelectable[] Buttons;
+    public TextMesh[] ButtonLetters;
+    public KMRuleSeedable RuleSeedable;
 
-    public bool[] line1Sol;
-    public bool[] line2Sol;
-    public bool[] line3Sol;
-
-    public KMSelectable[] line1but;
-    public KMSelectable[] line2but;
-    public KMSelectable[] line3but;
-
-    bool[] line1state = { false, false, false };
-    bool[] line2state = { false, false, false };
-    bool[] line3state = { false, false, false };
-
-    public TextMesh[] buttonLetters;
-
-    string[] alphabet = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
-
-    int lowLetter;
+    private readonly bool[] state = new bool[9];
+    private bool[] solution;    // will be populated by rule seed
+    private bool moduleSolved;
+    private int lowLetter;
+    private int moduleId;
+    private static int moduleIdCounter = 1;
 
     void Start()
     {
-        lowLetter = UnityEngine.Random.Range(0, 11);
+        moduleId = moduleIdCounter++;
+        var rnd = RuleSeedable.GetRNG();
+        Debug.Log($"[Letters #{moduleId}] Using rule seed: {rnd.Seed}");
+        solution = new bool[3 * 13];
+
+        // Fill the 13×3 grid with random booleans such that no 3×3 square is completely false.
+        // A cell has a 40% chance of being true.
+        // If we are in the bottom row, and the 3×3 above and to our left is all empty, we force a true value.
+        for (var i = 0; i < 3 * 13; i++)
+            solution[i] = i >= 2 * 13 + 2 && Enumerable.Range(0, 8).All(j => !solution[i - 2 * 13 - 2 + (j % 3) + 13 * (j / 3)]) || rnd.Next(0, 5) < 2;
+
+        Debug.Log($"♦ {solution.Select(s => s ? "1" : "0").Join("")}");
+
+        lowLetter = Random.Range(0, 11);
+        Debug.Log($"[Letters #{moduleId}] Letter range is: {(char) ('A' + lowLetter)}–{(char) ('A' + lowLetter + 15)}");
 
         AssignLetters();
     }
 
     void Awake()
     {
-        foreach (KMSelectable button in line1but)
-        {
-            button.OnInteract += delegate () { InputHandler1(button); return false; };
-        }
-        foreach (KMSelectable button in line2but)
-        {
-            button.OnInteract += delegate () { InputHandler2(button); return false; };
-        }
-        foreach (KMSelectable button in line3but)
-        {
-            button.OnInteract += delegate () { InputHandler3(button); return false; };
-        }
+        for (var buttonIx = 0; buttonIx < Buttons.Length; buttonIx++)
+            Buttons[buttonIx].OnInteract += InputHandler(buttonIx);
     }
 
     void Update()
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 9; i++)
         {
-            if (line1state[i])
+            if (state[i])
             {
-                Transform pos = line1but[i].GetComponent<Transform>();
-                
-                if (pos.localPosition.y > -0.005f)
-                {
-                    pos.localPosition -= new Vector3(0, 0.02f * Time.deltaTime, 0);
-                }
-                else if (pos.localPosition.y < -0.005f)
-                {
-                    pos.localPosition = new Vector3(pos.localPosition.x, -0.005f, pos.localPosition.z);
-                }
-            }
-        }
-
-        for (int i = 0; i < 3; i++)
-        {
-            if (line2state[i])
-            {
-                Transform pos = line2but[i].GetComponent<Transform>();
+                Transform pos = Buttons[i].GetComponent<Transform>();
 
                 if (pos.localPosition.y > -0.005f)
-                {
                     pos.localPosition -= new Vector3(0, 0.02f * Time.deltaTime, 0);
-                }
                 else if (pos.localPosition.y < -0.005f)
-                {
                     pos.localPosition = new Vector3(pos.localPosition.x, -0.005f, pos.localPosition.z);
-                }
-            }
-        }
-
-        for (int i = 0; i < 3; i++)
-        {
-            if (line3state[i])
-            {
-                Transform pos = line3but[i].GetComponent<Transform>();
-
-                if (pos.localPosition.y > -0.005f)
-                {
-                    pos.localPosition -= new Vector3(0, 0.02f * Time.deltaTime, 0);
-                }
-                else if (pos.localPosition.y < -0.005f)
-                {
-                    pos.localPosition = new Vector3(pos.localPosition.x, -0.005f, pos.localPosition.z);
-                }
             }
         }
     }
 
     void AssignLetters()
     {
-        List<string> curLetters = new List<string>();
-
+        var curLetters = new List<char>();
         for (int i = lowLetter; i < lowLetter + 16; i++)
-        {
-            curLetters.Add(alphabet[i]);
-        }
+            curLetters.Add((char) ('A' + i));
 
         for (int i = 0; i < 7; i++)
-        {
-            curLetters.RemoveAt(UnityEngine.Random.Range(1, 15-i));
-        }
+            curLetters.RemoveAt(Random.Range(1, 15 - i));
 
         for (int i = 0; i < 9; i++)
         {
-            int randIndex = UnityEngine.Random.Range(0, 9 - i);
-            buttonLetters[i].text = curLetters[randIndex];
+            int randIndex = Random.Range(0, 9 - i);
+            ButtonLetters[i].text = curLetters[randIndex].ToString();
             curLetters.RemoveAt(randIndex);
         }
     }
@@ -129,90 +83,38 @@ public class Letters : MonoBehaviour {
     {
         bool match = true;
 
-        for(int i = 0; i < line1state.Length; i++)
-            if (!(line1state[i] == line1Sol[i+lowLetter]))
-                match = false;
-        for (int i = 0; i < line2state.Length; i++)
-            if (!(line2state[i] == line2Sol[i + lowLetter]))
-                match = false;
-        for (int i = 0; i < line3state.Length; i++)
-            if (!(line3state[i] == line3Sol[i + lowLetter]))
+        for (int i = 0; i < state.Length; i++)
+            if (state[i] != solution[i % 3 + 13 * (i / 3) + lowLetter])
                 match = false;
 
         if (match)
-            module.HandlePass();
+        {
+            Module.HandlePass();
+            moduleSolved = true;
+        }
     }
 
-    void InputHandler1(KMSelectable button)
+    private KMSelectable.OnInteractHandler InputHandler(int index)
     {
-        int index = Array.IndexOf(line1but, button);
-
-        if (line1Sol[index + lowLetter] == true)
+        return delegate
         {
-            if (line1state[index] == false)
+            if (state[index])
+                return false;
+            Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
+            Buttons[index].AddInteractionPunch();
+            if (moduleSolved)
+                return false;
+            if (solution[index % 3 + 13 * (index / 3) + lowLetter])
             {
-                line1but[index].GetComponent<MeshRenderer>().material.color = new Color32(150, 150, 150, 255);
-
-                audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
-                line1but[index].AddInteractionPunch();
+                Buttons[index].GetComponent<MeshRenderer>().material.color = new Color32(150, 150, 150, 255);
+                state[index] = true;
+                CheckForSolveState();
             }
-            line1state[index] = true;
-            CheckForSolveState();
-        }
-        else
-        {
-            audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
-            line1but[index].AddInteractionPunch();
-            module.HandleStrike();
-        }
-
-    }
-    void InputHandler2(KMSelectable button)
-    {
-        int index = Array.IndexOf(line2but, button);
-
-        if (line2Sol[index + lowLetter] == true)
-        {
-            if (line2state[index] == false)
+            else
             {
-                line2but[index].GetComponent<MeshRenderer>().material.color = new Color32(150, 150, 150, 255);
-
-                audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
-                line2but[index].AddInteractionPunch();
+                Module.HandleStrike();
             }
-            line2state[index] = true;
-            CheckForSolveState();
-        }
-        else
-        {
-            audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
-            line2but[index].AddInteractionPunch();
-            module.HandleStrike();
-        }
-
-    }
-    void InputHandler3(KMSelectable button)
-    {
-        int index = Array.IndexOf(line3but, button);
-
-        if (line3Sol[index + lowLetter] == true)
-        {
-            if (line3state[index] == false)
-            {
-                line3but[index].GetComponent<MeshRenderer>().material.color = new Color32(150, 150, 150, 255);
-
-                audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
-                line3but[index].AddInteractionPunch();
-            }
-            line3state[index] = true;
-            CheckForSolveState();
-        }
-        else
-        {
-            audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, transform);
-            line3but[index].AddInteractionPunch();
-            module.HandleStrike();
-        }
-
+            return false;
+        };
     }
 }
