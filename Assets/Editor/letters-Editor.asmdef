@@ -1,0 +1,10 @@
+{
+  "name": "letters-Editor",
+  "references": [
+    "letters"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": []
+}
