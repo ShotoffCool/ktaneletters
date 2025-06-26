@@ -14,7 +14,7 @@ MonoBehaviour:
   id: letters
   title: Letters
   author: Shotoff Cool
-  description: A Vanilla like module for the Modder Secret Santa event
+  description: A Vanilla-like module for the Modder Secret Santa event
   version: 1.0
   outputFolder: build
   previewImage: {fileID: 2800000, guid: e89125407f2a93c4d8411ef3f91f35d4, type: 3}
